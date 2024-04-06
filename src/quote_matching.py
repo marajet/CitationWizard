@@ -44,10 +44,6 @@ def quote_match(orig: str, comp: str):
 
     return quotes
 
-# TWO BUGS:
-# 1. doesn't return the first word of the quote in the list
-# 2. returns empty list for second quote when there are more than one
-
 
 if __name__ == "__main__":
     files = {}
