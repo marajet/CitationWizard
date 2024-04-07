@@ -1,22 +1,24 @@
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import QApplication, QMainWindow, QTextEdit, QToolBar, QSpinBox, QComboBox, QFileDialog, QScrollArea, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel
+from PySide6.QtWidgets import QApplication, QMainWindow, QTextEdit, QToolBar, QSpinBox, QComboBox, QFileDialog, QScrollArea, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QPushButton
 from PySide6.QtCore import QThreadPool, Qt, QTimer
-from PySide6.QtGui import QAction, QPixmap, QFont
+from PySide6.QtGui import QAction, QPixmap, QFont, QColor
 
 from asyncWorker import Worker
 from elit_tokenizer import EnglishTokenizer
+from syntax import Highlighter
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.threadPool = QThreadPool()
         
-        self.text = textWindow(self.threadPool)
-        self.issues = issueList()
+        self.text = textWindow(self.threadPool, self)
+        self.highlighter = Highlighter(self.text)
+        self.issues = issueList(self)
         
         self.path = ""
         
-        font = QFont('Times New Roman', 12)
+        font = QFont('Times New Roman', 24)
         self.text.setFont(font)
         
         layout = QHBoxLayout()
@@ -64,10 +66,22 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(e)
             
+    def fixIssue(self, issue):
+        text = self.text.toPlainText()
+        newText = text.replace(issue.issueInfo['issueText'], issue.issueInfo['suggestedFix'])
+        self.text.setText(newText)
+        
+        self.highlighter.removeHighlight(issue.issueInfo['issueText'])
+        self.issues.removeIssue(issue.issueInfo)
 
 class textWindow(QTextEdit):
-    def __init__(self, threadPool):
+    def __init__(self, threadPool, manager):
         super().__init__()
+        self.manager = manager
+        self.issueColors = {
+            'test': Qt.red,
+            'test2': Qt.blue
+        }
         self.threadPool = threadPool
         self.typingTimer = QTimer()
         self.typingTimer.setSingleShot(True)
@@ -110,17 +124,36 @@ class textWindow(QTextEdit):
         currText = self.toPlainText()
 
         self.text = currText
-
-        return getNewTextHelper(oldText, currText)
+        
+        newText = getNewTextHelper(oldText, currText)
+        
+        return newText
     
     def updateIssues(self, tokens):
         worker = Worker(findIssues, tokens)
         worker.signals.result.connect(self.updateIssuesList)
+        
         self.threadPool.start(worker)
         
     def updateIssuesList(self, issues):
-        self.issues.updateIssues(issues)
+        text = self.toPlainText()
+        textTokens = EnglishTokenizer().tokenize(text)
+        
+        for issue in issues:
+            index = contains(issue['textToFix'], textTokens[0])
+            if index:
+                trueIndex = (textTokens[1][index[0]][0], textTokens[1][index[1] - 1][1])
+                
+                issueText = text[trueIndex[0]:trueIndex[1]]
+                
+                self.highlightIssue(issueText, self.issueColors[issue['typeOfError']])
+                issue['issueText'] = issueText
 
+                self.manager.issues.addIssue(issue)
+                
+           
+    def highlightIssue(self, text, color):
+        self.manager.highlighter.addHighlight(text, color)
        
 class fontSpinner(QSpinBox):
     def __init__(self):
@@ -155,7 +188,7 @@ class toolBar(QToolBar):
     def __init__(self, mainWindow):
         super().__init__()
         self.mainWindow = mainWindow
-        self.setStyleSheet("background: gray; border: none; spacing: 15px; padding-top: 5px; padding-bottom: 5px;")
+        self.setStyleSheet("QToolBar { background: gray; border: none; spacing: 15px; padding-top: 5px; padding-bottom: 5px;} QToolButton:pressed { background-color: rgb(255,255,255);}")
         self.setMovable(False)
         
         self.addSeparator()
@@ -225,8 +258,9 @@ class toolBar(QToolBar):
         
 
 class issueList(QScrollArea):
-    def __init__(self):
+    def __init__(self, manager):
         super().__init__()
+        self.manager = manager
         
         self.box = QGroupBox()
         
@@ -242,28 +276,26 @@ class issueList(QScrollArea):
         self.setMaximumWidth(200)
         self.setWidgetResizable(True)
         
-        testInfo = {
-            'issueTag': 'test',
-            'issueColor': 'blue'
-        }
-        
-        self.addIssue(testInfo)
-        
-        testInfo = {
-            'issueTag': 'test',
-            'issueColor': 'purple'
-        }
-        
-        self.addIssue(testInfo)
-        
     def addIssue(self, issueInfo):
-        newIssue = issue(issueInfo)
+        for i in range(self.boxLayout.count()):
+            if self.boxlayout.itemAt(i).widget().issueInfo == issueInfo:
+                return
+        newIssue = issue(issueInfo, self.manager)
         self.boxLayout.addWidget(newIssue)
     
+    def removeIssue(self, issueInfo):
+        for i in range(self.boxLayout.count()):
+            if self.boxLayout.itemAt(i).widget().issueInfo == issueInfo:
+                self.boxLayout.itemAt(i).widget().deleteLater()
+                self.boxLayout.removeWidget(self.boxLayout.itemAt(i).widget())
+                self.botLayout.removeItem(self.boxLayout.itemAt(i))
+                self.update()
+
 
 class issue(QWidget):
-    def __init__(self, issueInfo):
+    def __init__(self, issueInfo, manager):
         super().__init__()
+        self.manager = manager
         self.issueInfo = issueInfo
         self.layout = QVBoxLayout()
         
@@ -272,12 +304,16 @@ class issue(QWidget):
         box = QGroupBox()
         boxLayout = QHBoxLayout()
         
-        tag = QLabel(self.issueInfo['issueTag'])
+        tag = QLabel(self.issueInfo['typeOfError'])
         tag.setStyleSheet("background: transparent;")
-        
         boxLayout.addWidget(tag)
         
-        box.setStyleSheet("background: " + self.issueInfo['issueColor'] + "; border-radius: 10px")
+        fix = QPushButton("fix Issue")
+        fix.setStyleSheet("QPushButton { background: rgba(0, 0, 0, 0.5); border-radius: 5px; } QPushButton:Pressed { background-color: rgb(255,255,255);}")
+        fix.clicked.connect(lambda: self.manager.fixIssue(self))
+        boxLayout.addWidget(fix)
+        
+        box.setStyleSheet("background: rgba" + str(QColor(self.manager.text.issueColors[self.issueInfo['typeOfError']]).getRgb()) + "; border-radius: 10px")
         
         box.setLayout(boxLayout)
         
@@ -289,12 +325,32 @@ class issue(QWidget):
 def getNewTextHelper(oldText, currText):
     return currText.removeprefix(oldText)
 
+
 def parseNewText(text):
-    tokens = EnglishTokenizer().tokenize(text)[0]
+    tokens = EnglishTokenizer().tokenize(text)
     return tokens
 
-def findIssues(tokens):
-    pass
+
+def findIssues(tokens): #TODO update to call others methods
+    # Use GetTextIndexes at this stage
+    
+    return [
+        {
+            'typeOfError': 'test',
+            'textToFix': ['test', '.'],
+            'suggestedFix': "test(Ghandi)."
+        }
+    ]
+
+  
+def contains(small, big):
+    for i in range(len(big)-len(small)+1):
+        for j in range(len(small)):
+            if big[i+j] != small[j]:
+                break
+        else:
+            return i, i+len(small)
+    return False
 
  
 def main():
