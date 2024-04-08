@@ -111,16 +111,46 @@ def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int
     return quotes
 
 
+def find_quote_errors(documents: list[list[str]]) -> list[dict]:
+    errors = []
+
+    for i in range(1, len(documents)):
+        exact_quotes = exact_quote_match(documents[0], documents[i])
+        for quote in exact_quotes:
+            errors.append({
+                'typeOfError': 'Missing Quotation',
+                'textToFix': quote[2],
+                'suggestedFix': ['\"'] + quote[2] + ['\"']
+            })
+
+        similar_quotes = similar_quote_match(documents[0], documents[i])
+        for quote in similar_quotes:
+            overlap = False
+            for exact_quote in exact_quotes:
+                if quote[0] >= exact_quote[0] and quote[0] + len(quote) <= exact_quote[0] + len(exact_quote):
+                    overlap = True
+
+            if not overlap:
+                errors.append({
+                    'typeOfError': 'Poor Paraphrasing',
+                    'textToFix': quote[2],
+                    'suggestedFix': None
+                })
+
+    return errors
+
+
 if __name__ == "__main__":
-    files = {}
-    files.update(
-        {"original": "Anyway there's some other stuff here, etc. Given that hugles are great bugs, please do nothing." +
-                     " Some more other stuff for the sake of variety."})
-    files.update({"same": "Let's look at another example. Given that hugles are great bugs, please do nothing." +
-                          " Have you ever seen anything as neat as that?"})
-    files.update({"similar": "Well I said just like that! Given that hugles are big bugs, please don't do anything."
-                             + " Well anyway, there we were and I said to him, there we were!"})
-    files.update({"different": "Well there we were walking down to the river, and I said..."})
-    print(similar_quote_match(files["original"].split(" "), files["same"].split(" ")))
-    print(similar_quote_match(files["original"].split(" "), files["similar"].split(" ")))
-    print(similar_quote_match(files["original"].split(" "), files["different"].split(" ")))
+    files = []
+    original = ("Anyway there's some other stuff here, etc. Given that hugles are great bugs, please do nothing." +
+                " Some more other stuff for the sake of variety.")
+    same = ("Let's look at another example. Given that hugles are great bugs, please do nothing." +
+                          " Have you ever seen anything as neat as that?")
+    similar = ("Well I said just like that! Given that hugles are big bugs, please don't do anything."
+                             + " Well anyway, there we were and I said to him, there we were!")
+    different = "Well there we were walking down to the river, and I said..."
+    files.append(original.split(" "))
+    files.append(same.split(" "))
+    files.append(similar.split(" "))
+    files.append(different.split(" "))
+    print(find_quote_errors(files))
