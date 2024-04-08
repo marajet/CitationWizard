@@ -36,7 +36,7 @@ def exact_quote_match(orig: list[str], comp: list[str], threshold=3) -> list[tup
                         k_search += 1
                         k_orig += 1
                     # if the match meets the threshold for significant matches, return it as a quote
-                    if k_orig - j >= threshold:
+                    if k_orig - j >= threshold and orig[j] != '\"' and orig[k_orig] != '\"':
                         quotes.append((j, i - 1, orig[j:k_orig]))
                         i = k_search
         i += 1
