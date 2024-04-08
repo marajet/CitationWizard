@@ -6,6 +6,7 @@ from PySide6.QtGui import QAction, QPixmap, QFont, QColor
 from asyncWorker import Worker
 from elit_tokenizer import EnglishTokenizer
 from syntax import Highlighter
+from sourceEntry import entryWindow
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -73,10 +74,24 @@ class MainWindow(QMainWindow):
         
         self.highlighter.removeHighlight(issue.issueInfo['issueText'])
         self.issues.removeIssue(issue.issueInfo)
+        
+    def newSource(self):
+        textEntry = entryWindow()
+        if textEntry.exec():
+            sourceText = textEntry.getInput()
+            
+            worker = Worker(parseNewText, sourceText)
+            worker.signals.result.connect(lambda tokens: self.addSource((sourceText, tokens)))
+            self.threadPool.start(worker)
+    
+    def addSource(self, source):
+        self.text.worksCited.append(source)
+
 
 class textWindow(QTextEdit):
     def __init__(self, threadPool, manager):
         super().__init__()
+        self.worksCited = []
         self.manager = manager
         self.issueColors = {
             'test': Qt.red,
@@ -159,7 +174,7 @@ class fontSpinner(QSpinBox):
     def __init__(self):
         super().__init__()
         self.setRange(1, 100)
-        self.setValue(12)
+        self.setValue(24)
         self.setStyleSheet(
             "QSpinBox { color: black; background: white; border: 1px solid black; } "
             "QSpinBox::up-button { background: gray; border-left: 1px solid black; border-right: 1px solid black; border-bottom: 1px solid black;}"
@@ -256,6 +271,14 @@ class toolBar(QToolBar):
         underline.triggered.connect(self.mainWindow.text.underlineText)
         self.addAction(underline)
         
+        self.addSeparator()
+        
+        sourceBtn = QAction(QPixmap('frontend/icons/source.png'), 'Source', self)
+        sourceBtn.setToolTip('Press To Enter Source')
+        sourceBtn.triggered.connect(self.mainWindow.newSource)
+        self.addAction(sourceBtn)
+        
+        
 
 class issueList(QScrollArea):
     def __init__(self, manager):
@@ -288,7 +311,7 @@ class issueList(QScrollArea):
             if self.boxLayout.itemAt(i).widget().issueInfo == issueInfo:
                 self.boxLayout.itemAt(i).widget().deleteLater()
                 self.boxLayout.removeWidget(self.boxLayout.itemAt(i).widget())
-                self.botLayout.removeItem(self.boxLayout.itemAt(i))
+                self.boxLayout.removeItem(self.boxLayout.itemAt(i))
                 self.update()
 
 
@@ -332,8 +355,6 @@ def parseNewText(text):
 
 
 def findIssues(tokens): #TODO update to call others methods
-    # Use GetTextIndexes at this stage
-    
     return [
         {
             'typeOfError': 'test',
@@ -342,7 +363,7 @@ def findIssues(tokens): #TODO update to call others methods
         }
     ]
 
-  
+
 def contains(small, big):
     for i in range(len(big)-len(small)+1):
         for j in range(len(small)):
