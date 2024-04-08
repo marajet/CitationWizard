@@ -74,6 +74,8 @@ class MainWindow(QMainWindow):
         
         self.highlighter.removeHighlight(issue.issueInfo['issueText'])
         self.issues.removeIssue(issue.issueInfo)
+        self.text.justFixed = True
+        self.text.text = self.text.toPlainText()
         
     def newSource(self):
         textEntry = entryWindow()
@@ -91,6 +93,7 @@ class MainWindow(QMainWindow):
 class textWindow(QTextEdit):
     def __init__(self, threadPool, manager):
         super().__init__()
+        self.justFixed = False
         self.worksCited = []
         self.manager = manager
         self.issueColors = {
@@ -128,6 +131,9 @@ class textWindow(QTextEdit):
         self.typingTimer.start(1000)
     
     def handleNewText(self):
+        if self.justFixed:
+            self.justFixed = False
+            return
         newText = self.getNewText()
         worker = Worker(parseNewText, newText)
         
@@ -301,7 +307,7 @@ class issueList(QScrollArea):
         
     def addIssue(self, issueInfo):
         for i in range(self.boxLayout.count()):
-            if self.boxlayout.itemAt(i).widget().issueInfo == issueInfo:
+            if self.boxLayout.itemAt(i).widget().issueInfo == issueInfo:
                 return
         newIssue = issue(issueInfo, self.manager)
         self.boxLayout.addWidget(newIssue)
@@ -310,8 +316,6 @@ class issueList(QScrollArea):
         for i in range(self.boxLayout.count()):
             if self.boxLayout.itemAt(i).widget().issueInfo == issueInfo:
                 self.boxLayout.itemAt(i).widget().deleteLater()
-                self.boxLayout.removeWidget(self.boxLayout.itemAt(i).widget())
-                self.boxLayout.removeItem(self.boxLayout.itemAt(i))
                 self.update()
 
 
