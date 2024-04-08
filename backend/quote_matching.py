@@ -138,19 +138,3 @@ def find_quote_errors(documents: list[list[str]]) -> list[dict]:
                 })
 
     return errors
-
-
-if __name__ == "__main__":
-    files = []
-    original = ("Anyway there's some other stuff here, etc. Given that hugles are great bugs, please do nothing." +
-                " Some more other stuff for the sake of variety.")
-    same = ("Let's look at another example. Given that hugles are great bugs, please do nothing." +
-                          " Have you ever seen anything as neat as that?")
-    similar = ("Well I said just like that! Given that hugles are big bugs, please don't do anything."
-                             + " Well anyway, there we were and I said to him, there we were!")
-    different = "Well there we were walking down to the river, and I said..."
-    files.append(original.split(" "))
-    files.append(same.split(" "))
-    files.append(similar.split(" "))
-    files.append(different.split(" "))
-    print(find_quote_errors(files))
