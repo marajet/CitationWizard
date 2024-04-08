@@ -1,5 +1,12 @@
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import QApplication, QMainWindow, QTextEdit, QToolBar, QSpinBox, QComboBox, QFileDialog, QScrollArea, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QPushButton
+
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QTextEdit, QToolBar, 
+    QSpinBox, QComboBox, QFileDialog, QScrollArea, 
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
+    QLabel, QPushButton
+)
+
 from PySide6.QtCore import QThreadPool, Qt, QTimer
 from PySide6.QtGui import QAction, QPixmap, QFont, QColor
 
