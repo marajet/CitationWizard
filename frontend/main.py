@@ -359,7 +359,7 @@ def findIssues(tokens): #TODO update to call others methods
         {
             'typeOfError': 'test',
             'textToFix': ['test', '.'],
-            'suggestedFix': "test(Ghandi)."
+            'suggestedFix': "test(Albert Einstein)."
         }
     ]
 
