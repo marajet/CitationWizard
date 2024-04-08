@@ -36,7 +36,7 @@ def exact_quote_match(orig: list[str], comp: list[str], threshold=3) -> list[tup
                         k_search += 1
                         k_orig += 1
                     # if the match meets the threshold for significant matches, return it as a quote
-                    if k_orig - j >= threshold:
+                    if k_orig - j >= threshold and orig[j] != '\"' and orig[k_orig] != '\"':
                         quotes.append((j, i - 1, orig[j:k_orig]))
                         i = k_search
         i += 1
@@ -69,7 +69,6 @@ def find_range(len_orig: int, len_comp: int, quote: tuple[int, int, list[str]], 
     return orig_begin, orig_end, comp_begin, comp_end
 
 
-# note: this function does NOT match exact quotes!
 def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int, list[str]]]:
     quotes = []
     exact_quotes = exact_quote_match(orig, comp, 2)
@@ -111,16 +110,30 @@ def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int
     return quotes
 
 
-if __name__ == "__main__":
-    files = {}
-    files.update(
-        {"original": "Anyway there's some other stuff here, etc. Given that hugles are great bugs, please do nothing." +
-                     " Some more other stuff for the sake of variety."})
-    files.update({"same": "Let's look at another example. Given that hugles are great bugs, please do nothing." +
-                          " Have you ever seen anything as neat as that?"})
-    files.update({"similar": "Well I said just like that! Given that hugles are big bugs, please don't do anything."
-                             + " Well anyway, there we were and I said to him, there we were!"})
-    files.update({"different": "Well there we were walking down to the river, and I said..."})
-    print(similar_quote_match(files["original"].split(" "), files["same"].split(" ")))
-    print(similar_quote_match(files["original"].split(" "), files["similar"].split(" ")))
-    print(similar_quote_match(files["original"].split(" "), files["different"].split(" ")))
+def find_quote_errors(documents: list[list[str]]) -> list[dict]:
+    errors = []
+
+    for i in range(1, len(documents)):
+        exact_quotes = exact_quote_match(documents[0], documents[i])
+        for quote in exact_quotes:
+            errors.append({
+                'typeOfError': 'Missing Quotation',
+                'textToFix': quote[2],
+                'suggestedFix': ['\"'] + quote[2] + ['\"']
+            })
+
+        similar_quotes = similar_quote_match(documents[0], documents[i])
+        for quote in similar_quotes:
+            overlap = False
+            for exact_quote in exact_quotes:
+                if quote[0] >= exact_quote[0] and quote[0] + len(quote) <= exact_quote[0] + len(exact_quote):
+                    overlap = True
+
+            if not overlap:
+                errors.append({
+                    'typeOfError': 'Poor Paraphrasing',
+                    'textToFix': quote[2],
+                    'suggestedFix': None
+                })
+
+    return errors
