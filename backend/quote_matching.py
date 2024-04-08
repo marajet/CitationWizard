@@ -69,7 +69,6 @@ def find_range(len_orig: int, len_comp: int, quote: tuple[int, int, list[str]], 
     return orig_begin, orig_end, comp_begin, comp_end
 
 
-# note: this function does NOT match exact quotes!
 def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int, list[str]]]:
     quotes = []
     exact_quotes = exact_quote_match(orig, comp, 2)
