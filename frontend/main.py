@@ -15,6 +15,7 @@ from elit_tokenizer import EnglishTokenizer
 from syntax import Highlighter
 from sourceEntry import entryWindow
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
