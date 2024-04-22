@@ -38,9 +38,9 @@ class sourceWithBigramModel():
 @dataclass
 class inputWithBigramModel():
     textInputLiteral: str = None #The unprocessed text to search
-    textInputTokenized: str = None #Tokenized version of the text
+    textInputTokenized: list = None #Tokenized version of the text
 
-    sources: list[sourceWithBigramModel] = None #A list of source objects (pot. including the bigram model)
+    sources: list[sourceWithBigramModel] = None #A list of source objects
 
 
 
