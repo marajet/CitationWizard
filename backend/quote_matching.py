@@ -1,7 +1,12 @@
 from difflib import SequenceMatcher
+from dataclasses import dataclass, asdict
+from dataClassDefinitions import source, defaultFunctionInput, inputWithBigramModel, sourceWithBigramModel
+from collections import defaultdict, Counter
+
+UNKNOWN = ""
 
 
-def bag_of_bigrams(words: list[str]):
+def bag_of_bigrams(words: list[str]) -> dict[str, dict[str, list]]:
     bigrams = dict()
     previous = ""
     for i in range(len(words)):
@@ -18,7 +23,70 @@ def bag_of_bigrams(words: list[str]):
     return bigrams
 
 
-def exact_quote_match(orig: list[str], comp: list[str], threshold=3) -> list[tuple[int, int, list[str]]]:
+def bigram_model(document: sourceWithBigramModel) -> dict:
+    bigrams = dict()
+
+    counts = defaultdict(Counter)
+    bigram_locs = bag_of_bigrams(document.sourceTokenizedText)
+    for bigram_start in bigram_locs.keys():
+        for bigram_end, locs in bigram_locs[bigram_start].items():
+            counts[bigram_start][bigram_end] += len(locs)
+
+    vocabs = dict()
+    for prev, counter in counts.items():
+        vocabs[prev] = len(counter)
+
+    vocab = set(counts.keys())
+    for _, ccs in counts.items():
+        vocab.update(ccs.keys())
+
+    max_total = 0
+    for prev, ccs in counts.items():
+        total = sum(ccs.values()) + vocabs[prev]
+        if total > max_total:
+            max_total = total
+        temp = {curr: (count + 1) / total for curr, count in ccs.items()}
+        temp[UNKNOWN] = 1 / total
+        bigrams[prev] = temp
+    bigrams[UNKNOWN] = 1 / max_total
+
+    return bigrams
+
+
+def find_style_matches(documents: inputWithBigramModel) -> list[dict]:
+    errors = []
+    input = documents.textInputTokenized
+    for source in documents.sources:
+        if source.bigramModel is None:
+            source.bigramModel = bigram_model(source)
+
+        score = 0
+        start = 0
+        for i in range(1, len(input)):
+            prev = input[i - 1]
+            curr = input[i]
+            if "\n" in curr or i == len(input) - 1:
+                score /= i - start
+                if score >= 0.25:
+                    errors.append({
+                        'typeOfError': f'Content Match with {source.parenthetical}',
+                        'textToFix': input[start:i],
+                        'suggestedFix': None
+                    })
+                score = 0
+                start = i + 1
+
+            if prev not in source.bigramModel:
+                score += source.bigramModel[UNKNOWN]
+            else:
+                if curr not in source.bigramModel[prev]:
+                    curr = UNKNOWN
+                score += source.bigramModel[prev][curr]
+
+    return errors
+
+
+def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tuple[int, int, list[str]]]:
     quotes = []
     orig_bigrams = bag_of_bigrams(orig)
 
@@ -110,19 +178,19 @@ def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int
     return quotes
 
 
-def find_quote_errors(documents: list[list[str]]) -> list[dict]:
+def find_quote_errors(documents: defaultFunctionInput) -> list[dict]:
     errors = []
 
-    for i in range(1, len(documents)):
-        exact_quotes = exact_quote_match(documents[0], documents[i])
+    for source in documents.sources:
+        exact_quotes = exact_quote_match(documents.textInputTokenized, source.sourceTokenizedText)
         for quote in exact_quotes:
             errors.append({
                 'typeOfError': 'Missing Quotation',
                 'textToFix': quote[2],
-                'suggestedFix': ['\"'] + quote[2] + ['\"']
+                'suggestFix': ['\"'] + quote[2] + ['\"', source.parenthetical]
             })
 
-        similar_quotes = similar_quote_match(documents[0], documents[i])
+        similar_quotes = similar_quote_match(documents.textInputTokenized, source.sourceTokenizedText)
         for quote in similar_quotes:
             overlap = False
             for exact_quote in exact_quotes:
@@ -137,3 +205,54 @@ def find_quote_errors(documents: list[list[str]]) -> list[dict]:
                 })
 
     return errors
+
+if __name__ == '__main__':
+    input = []
+    sources = []
+    file = open("test0.txt")
+    for line in file:
+        words = line.split(" ")
+        for word in words:
+            input.append(word)
+    file.close()
+
+    file = open("test1.txt")
+    sources.append([])
+    for line in file:
+        words = line.split(" ")
+        for word in words:
+            sources[0].append(word)
+    file.close()
+
+    file = open("test2.txt")
+    sources.append([])
+    for line in file:
+        words = line.split(" ")
+        for word in words:
+            sources[1].append(word)
+    file.close()
+
+    file = open("test3.txt")
+    sources.append([])
+    for line in file:
+        words = line.split(" ")
+        for word in words:
+            sources[2].append(word)
+    file.close()
+
+    sourceObjects = []
+    i = 1
+    for sourceText in sources:
+        sourceObjects.append(source(sourceTokenizedText=sourceText, parenthetical=f"(test{i})"))
+        i += 1
+    prep_input = defaultFunctionInput(textInputTokenized=input, sources=sourceObjects)
+
+    sourceObjectsBigram = []
+    i = 1
+    for sourceText in sources:
+        sourceObjectsBigram.append(sourceWithBigramModel(sourceTokenizedText=sourceText, parenthetical=f"(test{i})"))
+        i += 1
+    prep_input_bigram = inputWithBigramModel(textInputTokenized=input, sources=sourceObjectsBigram)
+
+    print(find_quote_errors(prep_input))
+    print(find_style_matches(prep_input_bigram))
