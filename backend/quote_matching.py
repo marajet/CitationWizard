@@ -65,6 +65,7 @@ def find_style_matches(documents: inputWithBigramModel) -> tuple[inputWithBigram
         for i in range(1, len(input)):
             prev = input[i - 1]
             curr = input[i]
+            # checks each line
             if "\n" in curr or i == len(input) - 1:
                 score /= i - start
                 if score >= 0.25:
