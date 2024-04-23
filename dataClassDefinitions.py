@@ -27,6 +27,21 @@ class defaultFunctionInput():
     
     sources: list[source] = None #A list of source objects representing all input sources
 
+@dataclass
+class sourceWithBigramModel():
+    sourceLiteralText: str = None #Complete text of source
+    sourceTokenizedText: list = None #tokenized version of source text
+    parenthetical: str = None #Parenthetical citation for this source
+    bigramModel: dict = None #The bigram model for the source, if one has been created
+                            #Bigram model will be created in backend once and reused if needed again
+
+@dataclass
+class inputWithBigramModel():
+    textInputLiteral: str = None #The unprocessed text to search
+    textInputTokenized: list = None #Tokenized version of the text
+
+    sources: list[sourceWithBigramModel] = None #A list of source objects
+
 
 
    
