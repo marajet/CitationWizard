@@ -53,7 +53,7 @@ def bigram_model(document: sourceWithBigramModel) -> dict:
     return bigrams
 
 
-def find_style_matches(documents: inputWithBigramModel) -> list[dict]:
+def find_style_matches(documents: inputWithBigramModel) -> tuple[inputWithBigramModel, list[dict]]:
     errors = []
     input = documents.textInputTokenized
     for source in documents.sources:
@@ -65,6 +65,7 @@ def find_style_matches(documents: inputWithBigramModel) -> list[dict]:
         for i in range(1, len(input)):
             prev = input[i - 1]
             curr = input[i]
+            # checks each line
             if "\n" in curr or i == len(input) - 1:
                 score /= i - start
                 if score >= 0.25:
@@ -83,7 +84,7 @@ def find_style_matches(documents: inputWithBigramModel) -> list[dict]:
                     curr = UNKNOWN
                 score += source.bigramModel[prev][curr]
 
-    return errors
+    return documents, errors
 
 
 def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tuple[int, int, list[str]]]:
