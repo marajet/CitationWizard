@@ -21,19 +21,21 @@ class source():
     parenthetical: str = None #Parenthetical citation for this source
 
 @dataclass
-class defaultFunctionInput():
-    textInputLiteral: str = None #The unprocessed text to search
-    textInputTokenized: list = None #Tokenized version of the text
-    
-    sources: list[source] = None #A list of source objects representing all input sources
-
-@dataclass
 class sourceWithBigramModel():
     sourceLiteralText: str = None #Complete text of source
     sourceTokenizedText: list = None #tokenized version of source text
     parenthetical: str = None #Parenthetical citation for this source
+    bibliographic: str = None #Bibliographic citation for this source
+    sourceName: str = None #Name of the source
     bigramModel: dict = None #The bigram model for the source, if one has been created
-                            #Bigram model will be created in backend once and reused if needed again
+                            #Bigram model will be created in backend once and reused if needed again                 
+
+@dataclass
+class defaultFunctionInput():
+    textInputLiteral: str = None #The unprocessed text to search
+    textInputTokenized: list = None #Tokenized version of the text
+    
+    sources: list[sourceWithBigramModel] = None #A list of source objects representing all input sources
 
 @dataclass
 class inputWithBigramModel():
@@ -41,8 +43,6 @@ class inputWithBigramModel():
     textInputTokenized: list = None #Tokenized version of the text
 
     sources: list[sourceWithBigramModel] = None #A list of source objects
-
-
 
    
 if __name__ == "__main__": #Demo
