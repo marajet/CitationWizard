@@ -53,7 +53,7 @@ def bigram_model(document: sourceWithBigramModel) -> dict:
     return bigrams
 
 
-def find_style_matches(documents: inputWithBigramModel) -> list[dict]:
+def find_style_matches(documents: inputWithBigramModel) -> tuple[inputWithBigramModel, list[dict]]:
     errors = []
     input = documents.textInputTokenized
     for source in documents.sources:
@@ -83,7 +83,7 @@ def find_style_matches(documents: inputWithBigramModel) -> list[dict]:
                     curr = UNKNOWN
                 score += source.bigramModel[prev][curr]
 
-    return errors
+    return documents, errors
 
 
 def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tuple[int, int, list[str]]]:
