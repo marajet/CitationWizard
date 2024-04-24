@@ -70,6 +70,7 @@ def copyleaks_login():
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
+    
     response = requests.post(url, json=payload, headers=headers)
     return response.json().get("access_token")
 
