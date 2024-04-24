@@ -13,7 +13,16 @@ from PySide6.QtGui import QAction, QPixmap, QFont, QColor
 from asyncWorker import Worker
 from elit_tokenizer import EnglishTokenizer
 from syntax import Highlighter
-from sourceEntry import entryWindow
+from sourceEntry import advancedEntryWindow
+
+import path
+import sys
+
+directory = path.Path(__file__).abspath()
+sys.path.append(directory.parent.parent)
+
+from backend.quote_matching import find_quote_errors, find_style_matches
+from dataClassDefinitions import inputWithBigramModel, sourceWithBigramModel, defaultFunctionInput
 
 
 class MainWindow(QMainWindow):
@@ -86,16 +95,9 @@ class MainWindow(QMainWindow):
         self.text.text = self.text.toPlainText()
         
     def newSource(self):
-        textEntry = entryWindow()
-        if textEntry.exec():
-            sourceText = textEntry.getInput()
-            
-            worker = Worker(parseNewText, sourceText)
-            worker.signals.result.connect(lambda tokens: self.addSource((sourceText, tokens)))
-            self.threadPool.start(worker)
-    
-    def addSource(self, source):
-        self.text.worksCited.append(source)
+        self.textEntry = advancedEntryWindow(self.text.worksCited)
+        self.textEntry.signals.newSource.connect(lambda source: self.text.worksCited.append(source))
+        self.textEntry.show()
 
 
 class textWindow(QTextEdit):
@@ -104,9 +106,10 @@ class textWindow(QTextEdit):
         self.justFixed = False
         self.worksCited = []
         self.manager = manager
+        self.possibleColor = [Qt.red, Qt.blue, Qt.green, Qt.darkRed, Qt.darkBlue, Qt.darkGreen, Qt.cyan, Qt.magenta, Qt.yellow, Qt.darkCyan, Qt.darkMagenta, Qt.darkYellow]
+        self.possibleColorIndex = 0
         self.issueColors = {
-            'test': Qt.red,
-            'test2': Qt.blue
+            
         }
         self.threadPool = threadPool
         self.typingTimer = QTimer()
@@ -158,8 +161,11 @@ class textWindow(QTextEdit):
         
         return newText
     
-    def updateIssues(self, tokens):
-        worker = Worker(findIssues, tokens)
+    def updateIssues(self, info):
+        text = info[0]
+        tokens = info[1]
+        
+        worker = Worker(findIssues, text, tokens, self.worksCited)
         worker.signals.result.connect(self.updateIssuesList)
         
         self.threadPool.start(worker)
@@ -175,15 +181,24 @@ class textWindow(QTextEdit):
                 
                 issueText = text[trueIndex[0]:trueIndex[1]]
                 
+                self.makeIssueColor(issue['typeOfError'])
+                
                 self.highlightIssue(issueText, self.issueColors[issue['typeOfError']])
                 issue['issueText'] = issueText
 
                 self.manager.issues.addIssue(issue)
-                
            
     def highlightIssue(self, text, color):
         self.manager.highlighter.addHighlight(text, color)
-       
+        
+    def makeIssueColor(self, issue):
+        if issue not in self.issueColors.keys():
+            self.issueColors[issue] = self.possibleColor[self.possibleColorIndex]
+            self.possibleColorIndex += 1
+            if self.possibleColorIndex == len(self.possibleColor):
+                self.possibleColorIndex = 0
+
+
 class fontSpinner(QSpinBox):
     def __init__(self):
         super().__init__()
@@ -291,8 +306,7 @@ class toolBar(QToolBar):
         sourceBtn.setToolTip('Press To Enter Source')
         sourceBtn.triggered.connect(self.mainWindow.newSource)
         self.addAction(sourceBtn)
-        
-        
+
 
 class issueList(QScrollArea):
     def __init__(self, manager):
@@ -363,17 +377,34 @@ def getNewTextHelper(oldText, currText):
 
 def parseNewText(text):
     tokens = EnglishTokenizer().tokenize(text)
-    return tokens
+    return text, tokens
 
 
-def findIssues(tokens): #TODO update to call others methods
-    return [
-        {
-            'typeOfError': 'test',
-            'textToFix': ['test', '.'],
-            'suggestedFix': "test(Albert Einstein)."
-        }
-    ]
+def findIssues(text, tokens, worksCited: list[sourceWithBigramModel]): #TODO update to call others methods
+    totalErrors = []
+    
+    # textInfo = inputWithBigramModel()
+    # textInfo.textInputLiteral = text
+    # textInfo.textInputTokens = tokens
+    # textInfo.sources = worksCited
+    
+    
+    # newSources, newErrors = find_style_matches(textInfo)
+    
+    # for item in newErrors:
+    #     totalErrors.append(item)
+    
+    textInfo = defaultFunctionInput()
+    textInfo.textInputLiteral = text
+    textInfo.textInputTokenized = tokens
+    textInfo.sources = worksCited
+    
+    newErrors = find_quote_errors(textInfo)
+    
+    for item in newErrors:
+        totalErrors.append(item)
+    
+    return newErrors
 
 
 def contains(small, big):
@@ -390,6 +421,7 @@ def main():
     app = QApplication([])
     loader = QUiLoader()  # noqa: F841
     window = MainWindow()
+    # window = advancedEntryWindow([])
     window.setWindowTitle("Citation Wizard")
     window.show()
     app.exec()
