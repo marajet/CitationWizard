@@ -121,7 +121,7 @@ def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tup
                     else:
                         k_orig_index = k_orig
                     if k_orig - j >= threshold and (orig[j_index] != '\"' or orig[k_orig_index] != '\"'):
-                        quotes.append((j, i - 1, orig[j:k_orig + 1]))
+                        quotes.append((j, i - 1, orig[j:k_orig]))
                     i = k_comp
         i += 1
 
@@ -165,11 +165,11 @@ def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int
         # compare after ratio
         after_ratio = SequenceMatcher(a="".join(orig[(quote_orig_begin + len(quote)):orig_end]),
                                       b="".join(comp[(quote_orig_begin + len(quote)):comp_end])).ratio()
-        if before_ratio > 0.5 and after_ratio > 0.5:
+        if 1.0 > before_ratio > 0.5 and 1.0 > after_ratio > 0.5:
             quotes.append((orig_begin, comp_begin, orig[orig_begin:orig_end]))
-        elif before_ratio > 0.5:
+        elif 1.0 > before_ratio > 0.5:
             quotes.append((orig_begin, comp_begin, orig[orig_begin:(quote_orig_begin + len(quote))]))
-        elif after_ratio > 0.5:
+        elif 1.0 > after_ratio > 0.5:
             quotes.append((quote_orig_begin, quote_comp_begin, orig[quote_orig_begin:orig_end]))
         else:
             continue
