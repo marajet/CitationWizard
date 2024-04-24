@@ -4,10 +4,11 @@
 # IMPORTANT: This is the NLP PART!
 # calculate some threshold for top index, generate parenthetical from source?
 # output: list of dicts with error type, text to fix, and suggested fix(tokenized)
+
 # #Copyleaks API key
 # Make ..env fil, .gitignore, .env, so that the ..env file isn't pushed and then:
 # api key in   ..env file as API_KEY
-# Add ..env file to .gitignore, commit and do not
+# Add .env file to .gitignore, commit and do not include .env file
 
 # input, don't assume it starts sentence or ends with period, could be a lot of text, need to
 # run line by line. Could split by period.
@@ -20,7 +21,6 @@ from dotenv import load_dotenv
 import requests
 import tempfile
 import json as js
-
 
 global COPYLEAKS_API_KEY
 global EMAIL
@@ -70,20 +70,19 @@ def copyleaks_login():
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
+    
     response = requests.post(url, json=payload, headers=headers)
     return response.json().get("access_token")
 
 
-def copyleaks_submit_file(input: str, login_key:str) -> tuple[str, dataclass()]:
+def copyleaks_submit_file(input: str, login_key:str):
     # May want to sort results of request?
     # if "WEBHOOK_URL" not in os.environ:
     #     load_dotenv()
     #     WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "MISSING WEBHOOK URL")
-    scanID = ""
     with tempfile.NamedTemporaryFile(mode='r+', suffix='.txt') as temp_file:
         temp_file.write(input)
         filename = os.path.basename(temp_file.name)
-        scanID = filename
         url = "https://api.copyleaks.com/v3/scans/submit/file/"+filename
         payload = {
             "base64": "SGVsbG8gd29ybGQh",
@@ -105,7 +104,6 @@ def copyleaks_submit_file(input: str, login_key:str) -> tuple[str, dataclass()]:
             "Accept": "application/json"
         }
         response = requests.put(url, json=payload, headers=headers)
-        return scanID, response
 
 def webhook_fetch_latest_data():
     url = "https://webhook.site/token/"+WEBHOOK_URL_ID+"/requests?sorting=newest"
@@ -116,16 +114,28 @@ def webhook_fetch_latest_data():
     response = requests.get(url, headers=headers)
     return response
 
+def wait_for_webhook(current_count: int, new_inputs: int, interval=0.1):
+    while True:
+        if len(webhook_fetch_latest_data().json().get("data")) - current_count >= new_inputs:
+            return True
+        time.sleep(interval)
+
 def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
+    current_count = len(webhook_fetch_latest_data().json().get("data"))
     inputs = full_input.split(".")
+    if full_input.strip()[-1:] == ".":
+        inputs.pop()
+    if full_input.strip()[:1] == ".":
+        inputs.pop(0)
     errors = [{}] * len(inputs)
-    print(len(inputs))
     for i in range(len(inputs)):
         copyleaks_submit_file(inputs[i], login_key)
 
-    threshold = 49 # for comparison with aggregated Score
+    # Let webhook update properly before getting data
+    wait_for_webhook(current_count, len(inputs))
+
+    threshold = 0 # for comparison with aggregated Score
     json = webhook_fetch_latest_data().json().get("data")
-    print(len(json))
     for i in range(len(inputs)):
         singlejson = json[i]
         results = singlejson["content"]
@@ -140,7 +150,7 @@ def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
                 author = internet["metadata"]["author"]
                 # author is in metadata in internet, so is publication date
                 publishDate = internet["metadata"]["publishDate"]
-                suggestedFix = "(" + author + ", " + publishDate + ")"
+                suggestedFix = "\""+inputs[i].strip()+"\""+"(" + author + ", " + publishDate + ")."
             except KeyError:
                 pass
             # replace 0 with some index from loop
@@ -163,7 +173,7 @@ if __name__ == "__main__":
     # print(COPYLEAKS_API_KEY, EMAIL)
     access_token = copyleaks_login()
     print(access_token)
-    test2 = "our ultimate goal is to create and foster. increased participation in the sport of badminton nationwide"
+    test2 = "our ultimate goal is to create and foster increased participation in the sport of badminton nationwide "
     # resp = copyleaks_submit_file(test2, access_token)
     # print(resp[1].status_code)
     # print(resp[1].headers.get("id"))
