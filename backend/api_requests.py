@@ -116,13 +116,11 @@ def webhook_fetch_latest_data():
 def wait_for_webhook(current_count: int, new_inputs: int, interval=0.1):
     while True:
         if len(webhook_fetch_latest_data().json().get("data")) - current_count >= new_inputs:
-            print("Webhook has been updated!")
             return True
         time.sleep(interval)
 
 def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
     current_count = len(webhook_fetch_latest_data().json().get("data"))
-    print(current_count)
     inputs = full_input.split(".")
     if full_input.strip()[-1:] == ".":
         inputs.pop()
@@ -133,10 +131,9 @@ def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
         copyleaks_submit_file(inputs[i], login_key)
 
     # Let webhook update properly before getting data
-    print(len(inputs))
     wait_for_webhook(current_count, len(inputs))
 
-    threshold = 49 # for comparison with aggregated Score
+    threshold = 0 # for comparison with aggregated Score
     json = webhook_fetch_latest_data().json().get("data")
     for i in range(len(inputs)):
         singlejson = json[i]
@@ -152,7 +149,7 @@ def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
                 author = internet["metadata"]["author"]
                 # author is in metadata in internet, so is publication date
                 publishDate = internet["metadata"]["publishDate"]
-                suggestedFix = "(" + author + ", " + publishDate + ")"
+                suggestedFix = "\""+inputs[i].strip()+"\""+"(" + author + ", " + publishDate + ")."
             except KeyError:
                 pass
             # replace 0 with some index from loop
@@ -175,7 +172,7 @@ if __name__ == "__main__":
     # print(COPYLEAKS_API_KEY, EMAIL)
     access_token = copyleaks_login()
     print(access_token)
-    test2 = ".our .ultimate goal is to create and foster. increased participation in the sport of badminton nationwide. "
+    test2 = "our ultimate goal is to create and foster increased participation in the sport of badminton nationwide "
     # resp = copyleaks_submit_file(test2, access_token)
     # print(resp[1].status_code)
     # print(resp[1].headers.get("id"))
