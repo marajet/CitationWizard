@@ -100,13 +100,13 @@ def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tup
                 for j in orig_bigrams[comp[i - 1]][comp[i]]:
                     k_search = i + 1
                     k_orig = j + 2
-                    while (k_orig < len(orig) and k_search < len(comp) and
+                    while (k_orig < len(orig) - 1 and k_search < len(comp) - 1 and
                            orig[k_orig] == comp[k_search]):
                         k_search += 1
                         k_orig += 1
                     # if the match meets the threshold for significant matches, return it as a quote
                     if k_orig - j >= threshold and orig[j] != '\"' and orig[k_orig] != '\"':
-                        quotes.append((j, i - 1, orig[j:k_orig]))
+                        quotes.append((j, i - 1, orig[j:k_orig + 1]))
                         i = k_search
         i += 1
 
@@ -188,7 +188,7 @@ def find_quote_errors(documents: defaultFunctionInput) -> list[dict]:
             errors.append({
                 'typeOfError': 'Missing Quotation',
                 'textToFix': quote[2],
-                'suggestFix': ['\"'] + quote[2] + ['\"', source.parenthetical]
+                'suggestedFix': ' '.join(['\"'] + quote[2] + ['\"', source.parenthetical])
             })
 
         similar_quotes = similar_quote_match(documents.textInputTokenized, source.sourceTokenizedText)
