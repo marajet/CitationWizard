@@ -23,6 +23,7 @@ import tempfile
 import json as js
 import re
 
+
 global COPYLEAKS_API_KEY
 global EMAIL
 global WEBHOOK_API_KEY
@@ -128,7 +129,7 @@ def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
         inputs.pop()
     if full_input.strip()[:1] == ".":
         inputs.pop(0)
-    # Go back and combine strings that were split because of period was in et al.
+    # Go back and combine strings that were split because of period was in et al. also delete
     for i in range(len(inputs) - 1, -1, -1):
         if inputs[i].find("et al") > -1 and i < len(inputs) - 1:
             inputs[i] = inputs[i]+"."+inputs[i+1]
@@ -136,19 +137,14 @@ def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
 
     errors = [{}] * len(inputs)
     # Regular Expressions to find in-text citation from: https://stackoverflow.com/questions/4320958/regular-expression-for-recognizing-in-text-citations
-    # \((?:\s*(?:{A-Z}(?=[{a-z}{"'}])[{a-zA-Z}{\-.,;:!?}{"'}\s,.]+)?\b(18|19|20)\d\d[a-f]?\b;?\s*)+\)
-    author = "(?:[A-Z][A-Za-z'`-]+)"
-    etal = "(?:et al.?)"
-    additional = "(?:,? (?:(?:and |& )?" + author + "|" + etal + "))"
-    year_num = "(?:19|20)[0-9][0-9]"
-    page_num = "(?:, p.? [0-9]+)?"  # Always optional
-    year = "(?:, *" + year_num + page_num + "| *\\(" + year_num + page_num + "\\))"
-    regex = r"(" + author + additional + "*" + year + ")"
-    r = re.compile(regex)
+    regex = "\\([^()\\d]*\\d[^()]*\\)"
+    for i in range(len(inputs) - 1, -1, -1):
+        if re.search(regex, inputs[i]) is not None:
+            del inputs[i]
+
     for i in inputs:
         # if no parenthetical, check
-        if r.match(i) is None:
-            copyleaks_submit_file(i, login_key)
+        copyleaks_submit_file(i, login_key)
 
 
     # Let webhook update properly before getting data
@@ -198,12 +194,12 @@ if __name__ == "__main__":
     WEBHOOK_URL_ID = os.environ.get("WEBHOOK_URL_ID", "MISSING WEBHOOK URL")
     # print(COPYLEAKS_API_KEY, EMAIL)
     access_token = copyleaks_login()
-    print(access_token)
-    prompt = "It is a federation of 50 states, a federal capital district (Washington, D.C.), and 326 Indian reservations"
+    prompt = "It is a federation of 50 states, a federal capital district (Washington, DC), and 326 Indian reservations"
+    prompt2 = "A \"Hello, World!\" program is generally a simple computer program which outputs (or displays) to the screen (often the console) a message similar to \"Hello, World!\" while ignoring any user input"
     newprompt = "our ultimate (Simon et al., 2019). goal is to create and foster increased participation in the sport of badminton nationwide"
     # resp = copyleaks_submit_file(test2, access_token)
     # print(resp[1].status_code)
     # print(resp[1].headers.get("id"))
-    test = plagiarism_check(prompt, access_token)
-    # test = plagiarism_check(newprompt, access_token)
+    # test = plagiarism_check(prompt2, access_token)
+    test = plagiarism_check(newprompt, access_token)
     print(test)
