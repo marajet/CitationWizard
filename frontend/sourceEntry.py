@@ -13,7 +13,7 @@ import sys
 directory = path.Path(__file__).abspath()
 sys.path.append(directory.parent.parent)
 
-from dataClassDefinitions import sourceWithBigramModel
+from dataClassDefinitions import sourceWithBigramModel  # noqa: E402
 
 class entryWindow(QDialog):
     def __init__(self, parent=None):
