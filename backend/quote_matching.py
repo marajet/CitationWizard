@@ -1,5 +1,6 @@
 from difflib import SequenceMatcher
-from dataClassDefinitions import source, defaultFunctionInput, inputWithBigramModel, sourceWithBigramModel
+from dataclasses import dataclass, asdict  # noqa: F401
+from dataClassDefinitions import source, defaultFunctionInput, inputWithBigramModel, sourceWithBigramModel  # noqa: F401
 from collections import defaultdict, Counter
 
 UNKNOWN = ""
@@ -55,7 +56,7 @@ def bigram_model(document: sourceWithBigramModel) -> dict:
 def find_style_matches(documents: inputWithBigramModel) -> tuple[inputWithBigramModel, list[dict]]:
     errors = []
     input = documents.textInputTokenized
-    for source in documents.sources:
+    for source in documents.sources:  # noqa: F402
         if source.bigramModel is None:
             source.bigramModel = bigram_model(source)
 
@@ -200,7 +201,7 @@ def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int
 def find_quote_errors(documents: defaultFunctionInput) -> list[dict]:
     errors = []
 
-    for source in documents.sources:
+    for source in documents.sources:  # noqa: F402
         exact_quotes = exact_quote_match(documents.textInputTokenized, source.sourceTokenizedText)
         for quote in exact_quotes:
             if quote[2][len(quote[2]) - 1] == ".":

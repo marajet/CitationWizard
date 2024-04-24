@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 import requests
 import tempfile
 import json as js
+import re
 
 global COPYLEAKS_API_KEY
 global EMAIL
@@ -103,7 +104,7 @@ def copyleaks_submit_file(input: str, login_key:str):
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-        response = requests.put(url, json=payload, headers=headers)
+        response = requests.put(url, json=payload, headers=headers)  # noqa: F841
 
 def webhook_fetch_latest_data():
     url = "https://webhook.site/token/"+WEBHOOK_URL_ID+"/requests?sorting=newest"
@@ -127,9 +128,28 @@ def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
         inputs.pop()
     if full_input.strip()[:1] == ".":
         inputs.pop(0)
+    # Go back and combine strings that were split because of period was in et al.
+    for i in range(len(inputs) - 1, -1, -1):
+        if inputs[i].find("et al") > -1 and i < len(inputs) - 1:
+            inputs[i] = inputs[i]+"."+inputs[i+1]
+            del inputs[i+1]
+
     errors = [{}] * len(inputs)
-    for i in range(len(inputs)):
-        copyleaks_submit_file(inputs[i], login_key)
+    # Regular Expressions to find in-text citation from: https://stackoverflow.com/questions/4320958/regular-expression-for-recognizing-in-text-citations
+    # \((?:\s*(?:{A-Z}(?=[{a-z}{"'}])[{a-zA-Z}{\-.,;:!?}{"'}\s,.]+)?\b(18|19|20)\d\d[a-f]?\b;?\s*)+\)
+    author = "(?:[A-Z][A-Za-z'`-]+)"
+    etal = "(?:et al.?)"
+    additional = "(?:,? (?:(?:and |& )?" + author + "|" + etal + "))"
+    year_num = "(?:19|20)[0-9][0-9]"
+    page_num = "(?:, p.? [0-9]+)?"  # Always optional
+    year = "(?:, *" + year_num + page_num + "| *\\(" + year_num + page_num + "\\))"
+    regex = r"(" + author + additional + "*" + year + ")"
+    r = re.compile(regex)
+    for i in inputs:
+        # if no parenthetical, check
+        if r.match(i) is None:
+            copyleaks_submit_file(i, login_key)
+
 
     # Let webhook update properly before getting data
     wait_for_webhook(current_count, len(inputs))
@@ -142,15 +162,21 @@ def plagiarism_check(full_input: str, login_key: str) -> list[dict]:
         results = results[results.find("\"score\":{\""):]
         scores = js.loads(results[results.find("{\"identicalWords"):results.find(",\"internet")])
         aggregatedScore = scores["aggregatedScore"]
+        print(aggregatedScore)
         if aggregatedScore > threshold:
-            internet = js.loads(results[results.find("{\"url"):results.find("],\"database")])
+            # internet = js.loads(results[results.find("{\"url"):results.find("],\"database")])
+            internet = results[results.find("{\"url"):results.find(",\"tags")]
+            metadata = internet[internet.find("metadata\":{")+10:]
+            metadata = js.loads(metadata)
+            temp = internet[:results.find(",\"metadata\"")] + "}"
+            internet = js.loads(temp)
             url = internet["url"]
             suggestedFix = None
             try:
-                author = internet["metadata"]["author"]
+                author = metadata["author"]
                 # author is in metadata in internet, so is publication date
-                publishDate = internet["metadata"]["publishDate"]
-                suggestedFix = "\""+inputs[i].strip()+"\""+"(" + author + ", " + publishDate + ")."
+                publishDate = metadata["publishDate"]
+                suggestedFix = "\""+inputs[i].strip()+"\""+"(" + str(author) + ", " + str(publishDate) + ")."
             except KeyError:
                 pass
             # replace 0 with some index from loop
@@ -173,9 +199,11 @@ if __name__ == "__main__":
     # print(COPYLEAKS_API_KEY, EMAIL)
     access_token = copyleaks_login()
     print(access_token)
-    test2 = "our ultimate goal is to create and foster increased participation in the sport of badminton nationwide "
+    prompt = "It is a federation of 50 states, a federal capital district (Washington, D.C.), and 326 Indian reservations"
+    newprompt = "our ultimate (Simon et al., 2019). goal is to create and foster increased participation in the sport of badminton nationwide"
     # resp = copyleaks_submit_file(test2, access_token)
     # print(resp[1].status_code)
     # print(resp[1].headers.get("id"))
-    test = plagiarism_check(test2, access_token)
+    test = plagiarism_check(prompt, access_token)
+    # test = plagiarism_check(newprompt, access_token)
     print(test)

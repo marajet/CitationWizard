@@ -21,9 +21,9 @@ import sys
 directory = path.Path(__file__).abspath()
 sys.path.append(directory.parent.parent)
 
-from backend.quote_matching import find_quote_errors, find_style_matches
-from backend.api_requests import copyleaks_login, plagiarism_check
-from dataClassDefinitions import inputWithBigramModel, sourceWithBigramModel, defaultFunctionInput
+from backend.quote_matching import find_quote_errors, find_style_matches  # noqa: E402
+from backend.api_requests import copyleaks_login, plagiarism_check  # noqa: E402, F401
+from dataClassDefinitions import inputWithBigramModel, sourceWithBigramModel, defaultFunctionInput  # noqa: E402
 
 
 
@@ -194,11 +194,12 @@ class textWindow(QTextEdit):
                     trueIndex = (textTokens[1][index[0]][0], textTokens[1][index[1] - 1][1])
                     
                     issueText = text[trueIndex[0]:trueIndex[1]]
-                
-            self.makeIssueColor(issue['typeOfError'])
-                
-            self.highlightIssue(issueText, self.issueColors[issue['typeOfError']])
+                    
             issue['issueText'] = issueText
+                
+            self.makeIssueColor(issue['issueText'])
+                
+            self.highlightIssue(issueText, self.issueColors[issue['issueText']])
 
             self.manager.issues.addIssue(issue)
            
@@ -343,8 +344,10 @@ class issueList(QScrollArea):
         
     def addIssue(self, issueInfo):
         for i in range(self.boxLayout.count()):
-            if self.boxLayout.itemAt(i).widget().issueInfo == issueInfo:
+            if issueInfo['issueText'] in self.boxLayout.itemAt(i).widget().issueInfo['issueText']:
                 return
+            if self.boxLayout.itemAt(i).widget().issueInfo['issueText'] in issueInfo['issueText']:
+                self.removeIssue(self.boxLayout.itemAt(i).widget().issueInfo)
         newIssue = issue(issueInfo, self.manager)
         self.boxLayout.addWidget(newIssue)
     
@@ -376,7 +379,7 @@ class issue(QWidget):
         fix.clicked.connect(lambda: self.manager.fixIssue(self))
         boxLayout.addWidget(fix)
         
-        box.setStyleSheet("background: rgba" + str(QColor(self.manager.text.issueColors[self.issueInfo['typeOfError']]).getRgb()) + "; border-radius: 10px")
+        box.setStyleSheet("background: rgba" + str(QColor(self.manager.text.issueColors[self.issueInfo['issueText']]).getRgb()) + "; border-radius: 10px")
         
         box.setLayout(boxLayout)
         
@@ -400,33 +403,33 @@ def findIssues(text, tokens, worksCited: list[sourceWithBigramModel], copyleaksT
     
     totalErrors = []
     
-    # textInfo = inputWithBigramModel()
-    # textInfo.textInputLiteral = text
-    # textInfo.textInputTokens = tokens[0]
-    # textInfo.sources = worksCited
+    textInfo = inputWithBigramModel()
+    textInfo.textInputLiteral = text
+    textInfo.textInputTokenized = tokens[0]
+    textInfo.sources = worksCited
     
     
-    # newSources, newErrors = find_style_matches(textInfo)
-    
-    # for item in newErrors:
-    #     totalErrors.append(item)
-    
-    # textInfo = defaultFunctionInput()
-    # textInfo.textInputLiteral = text
-    # textInfo.textInputTokenized = tokens[0]
-    # textInfo.sources = worksCited
-    
-    # print(textInfo.textInputLiteral, textInfo.textInputTokenized)
-    
-    # newErrors = find_quote_errors(textInfo)
-    
-    # for item in newErrors:
-    #     totalErrors.append(item)
-    
-    newErrors = plagiarism_check(text, copyleaksToken)
+    newSources, newErrors = find_style_matches(textInfo)
     
     for item in newErrors:
         totalErrors.append(item)
+    
+    textInfo = defaultFunctionInput()
+    textInfo.textInputLiteral = text
+    textInfo.textInputTokenized = tokens[0]
+    textInfo.sources = worksCited
+    
+    print(textInfo.textInputLiteral, textInfo.textInputTokenized)
+    
+    newErrors = find_quote_errors(textInfo)
+    
+    # for item in newErrors:
+    #     totalErrors.append(item)
+    
+    # newErrors = plagiarism_check(text, copyleaksToken)
+    
+    # for item in newErrors:
+    #     totalErrors.append(item)
 
     return newErrors
 
