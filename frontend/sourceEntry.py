@@ -4,14 +4,16 @@ from PySide6.QtWidgets import(
     QFormLayout, QGroupBox, QHBoxLayout
 )
 from PySide6.QtCore import Qt, Signal, QObject
+from elit_tokenizer import EnglishTokenizer
 
 import path
 import sys
 
+
 directory = path.Path(__file__).abspath()
 sys.path.append(directory.parent.parent)
 
-from dataClassDefinitions import sourceWithBigramModel
+from dataClassDefinitions import sourceWithBigramModel  # noqa: E402
 
 class entryWindow(QDialog):
     def __init__(self, parent=None):
@@ -25,8 +27,8 @@ class entryWindow(QDialog):
         
         layout.addWidget(buttonBox, 1, 0, Qt.AlignCenter)
         
-        self.setWindowTitle("Source Entry")
-        self.input.setPlaceholderText("Enter source here")
+        self.setWindowTitle("Suggest Fix")
+        self.input.setPlaceholderText("Sorry, but we can't find an automatic fix, please suggest a fix here.")
         
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
@@ -89,7 +91,7 @@ class advancedEntryWindow(QWidget):
         self.newSources.confirmButton.clicked.connect(self.addSource)
         
         for source in sources:
-            self.tabs.addTab(Source(source), source['name'])
+            self.tabs.addTab(Source(source), source.sourceName)
             
         self.setLayout(layout)
             
@@ -100,6 +102,7 @@ class advancedEntryWindow(QWidget):
             sourceInfo = getInfo.getInput()
             
         sourceInfo.sourceLiteralText = sourceText
+        sourceInfo.sourceTokenizedText = EnglishTokenizer().tokenize(sourceText)[0]
         
         self.tabs.addTab(Source(sourceInfo), sourceInfo.sourceName)
         self.editedSources.append(sourceInfo)

@@ -13,7 +13,7 @@ from PySide6.QtGui import QAction, QPixmap, QFont, QColor
 from asyncWorker import Worker
 from elit_tokenizer import EnglishTokenizer
 from syntax import Highlighter
-from sourceEntry import advancedEntryWindow
+from sourceEntry import advancedEntryWindow, entryWindow
 
 import path
 import sys
@@ -21,8 +21,10 @@ import sys
 directory = path.Path(__file__).abspath()
 sys.path.append(directory.parent.parent)
 
-from backend.quote_matching import find_quote_errors, find_style_matches
-from dataClassDefinitions import inputWithBigramModel, sourceWithBigramModel, defaultFunctionInput
+from backend.quote_matching import find_quote_errors, find_style_matches  # noqa: E402
+from backend.api_requests import copyleaks_login, plagiarism_check  # noqa: E402, F401
+from dataClassDefinitions import inputWithBigramModel, sourceWithBigramModel, defaultFunctionInput  # noqa: E402
+
 
 
 class MainWindow(QMainWindow):
@@ -86,6 +88,13 @@ class MainWindow(QMainWindow):
             
     def fixIssue(self, issue):
         text = self.text.toPlainText()
+        if issue.issueInfo['suggestedFix'] is None:
+            entry = entryWindow()
+            if entry.exec():
+                issue.issueInfo['suggestedFix'] = entry.getInput()
+        
+        print(issue.issueInfo)
+        
         newText = text.replace(issue.issueInfo['issueText'], issue.issueInfo['suggestedFix'])
         self.text.setText(newText)
         
@@ -106,6 +115,7 @@ class textWindow(QTextEdit):
         self.justFixed = False
         self.worksCited = []
         self.manager = manager
+        self.copyleaksToken = copyleaks_login()
         self.possibleColor = [Qt.red, Qt.blue, Qt.green, Qt.darkRed, Qt.darkBlue, Qt.darkGreen, Qt.cyan, Qt.magenta, Qt.yellow, Qt.darkCyan, Qt.darkMagenta, Qt.darkYellow]
         self.possibleColorIndex = 0
         self.issueColors = {
@@ -165,7 +175,7 @@ class textWindow(QTextEdit):
         text = info[0]
         tokens = info[1]
         
-        worker = Worker(findIssues, text, tokens, self.worksCited)
+        worker = Worker(findIssues, text, tokens, self.worksCited, self.copyleaksToken)
         worker.signals.result.connect(self.updateIssuesList)
         
         self.threadPool.start(worker)
@@ -175,18 +185,23 @@ class textWindow(QTextEdit):
         textTokens = EnglishTokenizer().tokenize(text)
         
         for issue in issues:
-            index = contains(issue['textToFix'], textTokens[0])
-            if index:
-                trueIndex = (textTokens[1][index[0]][0], textTokens[1][index[1] - 1][1])
+            issueText = ""
+            if isinstance(issue['textToFix'], str):
+                issueText = issue['textToFix']
+            else:
+                index = contains(issue['textToFix'], textTokens[0])
+                if index:
+                    trueIndex = (textTokens[1][index[0]][0], textTokens[1][index[1] - 1][1])
+                    
+                    issueText = text[trueIndex[0]:trueIndex[1]]
+                    
+            issue['issueText'] = issueText
                 
-                issueText = text[trueIndex[0]:trueIndex[1]]
+            self.makeIssueColor(issue['issueText'])
                 
-                self.makeIssueColor(issue['typeOfError'])
-                
-                self.highlightIssue(issueText, self.issueColors[issue['typeOfError']])
-                issue['issueText'] = issueText
+            self.highlightIssue(issueText, self.issueColors[issue['issueText']])
 
-                self.manager.issues.addIssue(issue)
+            self.manager.issues.addIssue(issue)
            
     def highlightIssue(self, text, color):
         self.manager.highlighter.addHighlight(text, color)
@@ -329,8 +344,10 @@ class issueList(QScrollArea):
         
     def addIssue(self, issueInfo):
         for i in range(self.boxLayout.count()):
-            if self.boxLayout.itemAt(i).widget().issueInfo == issueInfo:
+            if issueInfo['issueText'] in self.boxLayout.itemAt(i).widget().issueInfo['issueText']:
                 return
+            if self.boxLayout.itemAt(i).widget().issueInfo['issueText'] in issueInfo['issueText']:
+                self.removeIssue(self.boxLayout.itemAt(i).widget().issueInfo)
         newIssue = issue(issueInfo, self.manager)
         self.boxLayout.addWidget(newIssue)
     
@@ -362,7 +379,7 @@ class issue(QWidget):
         fix.clicked.connect(lambda: self.manager.fixIssue(self))
         boxLayout.addWidget(fix)
         
-        box.setStyleSheet("background: rgba" + str(QColor(self.manager.text.issueColors[self.issueInfo['typeOfError']]).getRgb()) + "; border-radius: 10px")
+        box.setStyleSheet("background: rgba" + str(QColor(self.manager.text.issueColors[self.issueInfo['issueText']]).getRgb()) + "; border-radius: 10px")
         
         box.setLayout(boxLayout)
         
@@ -380,30 +397,40 @@ def parseNewText(text):
     return text, tokens
 
 
-def findIssues(text, tokens, worksCited: list[sourceWithBigramModel]): #TODO update to call others methods
+def findIssues(text, tokens, worksCited: list[sourceWithBigramModel], copyleaksToken): #TODO update to call others methods
+    if len(tokens[0]) < 5:
+        return []
+    
     totalErrors = []
     
-    # textInfo = inputWithBigramModel()
-    # textInfo.textInputLiteral = text
-    # textInfo.textInputTokens = tokens
-    # textInfo.sources = worksCited
-    
-    
-    # newSources, newErrors = find_style_matches(textInfo)
-    
-    # for item in newErrors:
-    #     totalErrors.append(item)
-    
-    textInfo = defaultFunctionInput()
+    textInfo = inputWithBigramModel()
     textInfo.textInputLiteral = text
-    textInfo.textInputTokenized = tokens
+    textInfo.textInputTokenized = tokens[0]
     textInfo.sources = worksCited
     
-    newErrors = find_quote_errors(textInfo)
+    
+    newSources, newErrors = find_style_matches(textInfo)
     
     for item in newErrors:
         totalErrors.append(item)
     
+    textInfo = defaultFunctionInput()
+    textInfo.textInputLiteral = text
+    textInfo.textInputTokenized = tokens[0]
+    textInfo.sources = worksCited
+    
+    print(textInfo.textInputLiteral, textInfo.textInputTokenized)
+    
+    newErrors = find_quote_errors(textInfo)
+    
+    # for item in newErrors:
+    #     totalErrors.append(item)
+    
+    # newErrors = plagiarism_check(text, copyleaksToken)
+    
+    # for item in newErrors:
+    #     totalErrors.append(item)
+
     return newErrors
 
 

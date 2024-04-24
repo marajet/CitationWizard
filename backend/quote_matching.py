@@ -1,6 +1,6 @@
 from difflib import SequenceMatcher
-from dataclasses import dataclass, asdict
-from dataClassDefinitions import source, defaultFunctionInput, inputWithBigramModel, sourceWithBigramModel
+from dataclasses import dataclass, asdict  # noqa: F401
+from dataClassDefinitions import source, defaultFunctionInput, inputWithBigramModel, sourceWithBigramModel  # noqa: F401
 from collections import defaultdict, Counter
 
 UNKNOWN = ""
@@ -56,7 +56,7 @@ def bigram_model(document: sourceWithBigramModel) -> dict:
 def find_style_matches(documents: inputWithBigramModel) -> tuple[inputWithBigramModel, list[dict]]:
     errors = []
     input = documents.textInputTokenized
-    for source in documents.sources:
+    for source in documents.sources:  # noqa: F402
         if source.bigramModel is None:
             source.bigramModel = bigram_model(source)
 
@@ -98,16 +98,31 @@ def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tup
             if comp[i] in orig_bigrams[comp[i - 1]]:
                 # if bigram is in both original and comparison, search for end of exact match
                 for j in orig_bigrams[comp[i - 1]][comp[i]]:
-                    k_search = i + 1
-                    k_orig = j + 2
-                    while (k_orig < len(orig) - 1 and k_search < len(comp) - 1 and
-                           orig[k_orig] == comp[k_search]):
-                        k_search += 1
+                    if i + 1 < len(comp) - 1:
+                        k_comp = i + 1
+                    else:
+                        k_comp = len(comp) - 1
+                    if j + 2 < len(orig) - 1:
+                        k_orig = j + 2
+                    else:
+                        k_orig = len(orig) - 1
+
+                    while (k_orig < len(orig) - 1 and k_comp < len(comp) - 1 and
+                           orig[k_orig] == comp[k_comp]):
+                        k_comp += 1
                         k_orig += 1
                     # if the match meets the threshold for significant matches, return it as a quote
-                    if k_orig - j >= threshold and orig[j] != '\"' and orig[k_orig] != '\"':
+                    if j > 0:
+                        j_index = j - 1
+                    else:
+                        j_index = 0
+                    if k_orig + 1 < len(orig):
+                        k_orig_index = k_orig + 1
+                    else:
+                        k_orig_index = k_orig
+                    if k_orig - j >= threshold and (orig[j_index] != '\"' or orig[k_orig_index] != '\"'):
                         quotes.append((j, i - 1, orig[j:k_orig + 1]))
-                        i = k_search
+                    i = k_comp
         i += 1
 
     return quotes
@@ -150,11 +165,11 @@ def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int
         # compare after ratio
         after_ratio = SequenceMatcher(a="".join(orig[(quote_orig_begin + len(quote)):orig_end]),
                                       b="".join(comp[(quote_orig_begin + len(quote)):comp_end])).ratio()
-        if before_ratio > 0.5 and after_ratio > 0.5:
+        if 1.0 > before_ratio > 0.5 and 1.0 > after_ratio > 0.5:
             quotes.append((orig_begin, comp_begin, orig[orig_begin:orig_end]))
-        elif before_ratio > 0.5:
+        elif 1.0 > before_ratio > 0.5:
             quotes.append((orig_begin, comp_begin, orig[orig_begin:(quote_orig_begin + len(quote))]))
-        elif after_ratio > 0.5:
+        elif 1.0 > after_ratio > 0.5:
             quotes.append((quote_orig_begin, quote_comp_begin, orig[quote_orig_begin:orig_end]))
         else:
             continue
@@ -182,7 +197,7 @@ def similar_quote_match(orig: list[str], comp: list[str]) -> list[tuple[int, int
 def find_quote_errors(documents: defaultFunctionInput) -> list[dict]:
     errors = []
 
-    for source in documents.sources:
+    for source in documents.sources:  # noqa: F402
         exact_quotes = exact_quote_match(documents.textInputTokenized, source.sourceTokenizedText)
         for quote in exact_quotes:
             errors.append({

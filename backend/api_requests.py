@@ -71,6 +71,7 @@ def copyleaks_login():
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
+    
     response = requests.post(url, json=payload, headers=headers)
     return response.json().get("access_token")
 
@@ -103,7 +104,7 @@ def copyleaks_submit_file(input: str, login_key:str):
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-        response = requests.put(url, json=payload, headers=headers)
+        response = requests.put(url, json=payload, headers=headers)  # noqa: F841
 
 def webhook_fetch_latest_data():
     url = "https://webhook.site/token/"+WEBHOOK_URL_ID+"/requests?sorting=newest"
