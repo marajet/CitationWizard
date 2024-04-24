@@ -1,5 +1,4 @@
 from difflib import SequenceMatcher
-from dataclasses import dataclass, asdict
 from dataClassDefinitions import source, defaultFunctionInput, inputWithBigramModel, sourceWithBigramModel
 from collections import defaultdict, Counter
 
@@ -66,8 +65,11 @@ def find_style_matches(documents: inputWithBigramModel) -> tuple[inputWithBigram
             prev = input[i - 1]
             curr = input[i]
             # checks each line
-            if "\n" in curr or i == len(input) - 1:
-                score /= i - start
+            if curr == "." or i == len(input) - 1:
+                if i - start == 0:
+                    score = 0
+                else:
+                    score /= i - start
                 if score >= 0.25:
                     errors.append({
                         'typeOfError': f'Content Match with {source.parenthetical}',
@@ -98,19 +100,20 @@ def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tup
             if comp[i] in orig_bigrams[comp[i - 1]]:
                 # if bigram is in both original and comparison, search for end of exact match
                 for j in orig_bigrams[comp[i - 1]][comp[i]]:
-                    if i + 1 < len(comp) - 1:
-                        k_comp = i + 1
+                    if i < len(comp) - 1:
+                        k_comp = i
                     else:
                         k_comp = len(comp) - 1
-                    if j + 2 < len(orig) - 1:
-                        k_orig = j + 2
+                    if j + 1 < len(orig) - 1:
+                        k_orig = j + 1
                     else:
                         k_orig = len(orig) - 1
 
-                    while (k_orig < len(orig) - 1 and k_comp < len(comp) - 1 and
+                    while (k_orig < len(orig) and k_comp < len(comp) and
                            orig[k_orig] == comp[k_comp]):
                         k_comp += 1
                         k_orig += 1
+                    k_orig -= 1
                     # if the match meets the threshold for significant matches, return it as a quote
                     if j > 0:
                         j_index = j - 1
@@ -120,8 +123,8 @@ def exact_quote_match(orig: list[str], comp: list[str], threshold=5) -> list[tup
                         k_orig_index = k_orig + 1
                     else:
                         k_orig_index = k_orig
-                    if k_orig - j >= threshold and (orig[j_index] != '\"' or orig[k_orig_index] != '\"'):
-                        quotes.append((j, i - 1, orig[j:k_orig]))
+                    if k_orig - j + 1 >= threshold and (orig[j_index] != '\"' or orig[k_orig_index] != '\"'):
+                        quotes.append((j, i - 1, orig[j:k_orig + 2]))
                     i = k_comp
         i += 1
 
@@ -200,10 +203,14 @@ def find_quote_errors(documents: defaultFunctionInput) -> list[dict]:
     for source in documents.sources:
         exact_quotes = exact_quote_match(documents.textInputTokenized, source.sourceTokenizedText)
         for quote in exact_quotes:
+            if quote[2][len(quote[2]) - 1] == ".":
+                suggested_fix = ' '.join(['\"'] + quote[2][:len(quote[2]) - 1] + ['\"', source.parenthetical, '.'])
+            else:
+                suggested_fix = ' '.join(['\"'] + quote[2] + ['\"', source.parenthetical])
             errors.append({
                 'typeOfError': 'Missing Quotation',
                 'textToFix': quote[2],
-                'suggestedFix': ' '.join(['\"'] + quote[2] + ['\"', source.parenthetical])
+                'suggestedFix': suggested_fix
             })
 
         similar_quotes = similar_quote_match(documents.textInputTokenized, source.sourceTokenizedText)
