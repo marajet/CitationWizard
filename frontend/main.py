@@ -1,5 +1,3 @@
-from PySide6.QtUiTools import QUiLoader
-
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QTextEdit, QToolBar, 
     QSpinBox, QComboBox, QFileDialog, QScrollArea, 
@@ -423,8 +421,8 @@ def findIssues(text, tokens, worksCited: list[sourceWithBigramModel], copyleaksT
     
     newErrors = find_quote_errors(textInfo)
     
-    # for item in newErrors:
-    #     totalErrors.append(item)
+    for item in newErrors:
+        totalErrors.append(item)
     
     # newErrors = plagiarism_check(text, copyleaksToken)
     
@@ -446,7 +444,6 @@ def contains(small, big):
  
 def main():
     app = QApplication([])
-    loader = QUiLoader()  # noqa: F841
     window = MainWindow()
     # window = advancedEntryWindow([])
     window.setWindowTitle("Citation Wizard")
